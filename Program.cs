@@ -71,7 +71,8 @@ namespace HelpjuiceConverter
             // Markdown Converter Setup
             var config = new ReverseMarkdown.Config
             {
-                GithubFlavored = true // generate GitHub flavoured markdown, supported for BR, PRE and table tags
+                GithubFlavored = true, // generate GitHub flavoured markdown, supported for BR, PRE and table tags
+                UnknownTags = Config.UnknownTagsOption.Bypass
             };
 
             markdownConverter = new Converter(config);
@@ -209,7 +210,9 @@ namespace HelpjuiceConverter
                         if (processedQuestions.ContainsKey(a.question_id))
                         {
                             var filename = processedQuestions[a.question_id];
-                            FileHandler(filename, markdownConverter.Convert(a.body));
+                            var content = a.body;
+                            SanitizeHTML(ref content);
+                            FileHandler(filename, markdownConverter.Convert(content));
                         }
                     }
                     page++;
@@ -282,6 +285,14 @@ namespace HelpjuiceConverter
             {
                 stream.Write(contents);
             }
+        }
+
+        // Helper method for cleaning inbound HTML
+        static void SanitizeHTML(ref string html)
+        {
+            // Someone put preformatted code inside a 1x1 table--a lot :|
+            html = html.Replace("<table style=\"width: 100%;\"><tbody><tr><td style=\"width: 100%;\"><pre>", "<pre>");
+            html = html.Replace("</pre></td></tr></tbody></table>", "</pre>");
         }
     }
 }
