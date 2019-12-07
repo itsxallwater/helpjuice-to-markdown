@@ -1,16 +1,15 @@
-﻿using System;
+﻿using CsvHelper;
+using HelpjuiceConverter.Entities;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using ReverseMarkdown;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
-
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-
-using CsvHelper;
-using HelpjuiceConverter.Entities;
-using ReverseMarkdown;
 
 namespace HelpjuiceConverter
 {
@@ -23,7 +22,7 @@ namespace HelpjuiceConverter
         static Dictionary<int, string> processedDirectories = new Dictionary<int, string>();
         static Dictionary<int, string> processedQuestions = new Dictionary<int, string>();
 
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
             var timer = System.Diagnostics.Stopwatch.StartNew();
 
@@ -31,10 +30,10 @@ namespace HelpjuiceConverter
 
             Console.WriteLine("Converting Docs from HelpJuice to Markdown");
 
-            RunAsync().GetAwaiter().GetResult();
+            await RunAsync();
 
             timer.Stop();
-            Console.WriteLine("Processing Completed in " + timer.Elapsed.ToString());
+            Console.WriteLine($"Processing Completed in {timer.Elapsed.ToString()}");
         }
 
         static void Startup()
@@ -69,7 +68,7 @@ namespace HelpjuiceConverter
             secrets = revealer.Reveal();
 
             // Markdown Converter Setup
-            var config = new ReverseMarkdown.Config
+            var config = new Config
             {
                 GithubFlavored = true, // generate GitHub flavoured markdown, supported for BR, PRE and table tags
                 UnknownTags = Config.UnknownTagsOption.Bypass
@@ -81,9 +80,9 @@ namespace HelpjuiceConverter
         // Process a HelpJuice site/account i.e. site.helpjuice.com
         static async Task ProcessSite(string site)
         {
-            Console.WriteLine("Processing for " + site);
+            Console.WriteLine($"Processing for {site}");
 
-            var rootPath = "C:\\Temp\\Docs\\" + site + "\\";
+            var rootPath = Path.Combine(Path.GetTempPath(), "Docs", site);
             DirectoryHandler(rootPath);
 
             var key = secrets[site];
@@ -99,28 +98,28 @@ namespace HelpjuiceConverter
         static async Task ProcessCategories(string site, string rootPath, string key)
         {
 
-            var url = new Uri("https://" + site + ".helpjuice.com/api/categories?api_key=" + key);
+            var url = new UriBuilder("https", $"{site}.helpjuice.com", 443, "/api/categories", $"api_key={key}").Uri;
             var categories = await GetAsync<Category>(client, url);
 
             // Categories have parent/child relationship and unpack to directory/sub-directories
-            Console.WriteLine("Converting " + categories.Count + " categories into directories");
+            Console.WriteLine($"Converting {categories.Count} categories into directories");
 
             while (categories.Count > 0)
             {
                 var tempCategories = new List<Category>(categories);
                 foreach (var c in tempCategories)
                 {
-                    if (c.parent_id == null || (c.parent_id != null && processedDirectories.ContainsKey(c.parent_id.Value)))
+                    if (c.ParentId == null || (c.ParentId != null && processedDirectories.ContainsKey(c.ParentId.Value)))
                     {
                         var basePath = rootPath;
-                        if (c.parent_id != null)
+                        if (c.ParentId != null)
                         {
-                            basePath = processedDirectories[c.parent_id.Value];
+                            basePath = processedDirectories[c.ParentId.Value];
                         }
 
-                        var fullPath = basePath + "\\" + c.name.Trim();
+                        var fullPath = Path.Combine(basePath, c.Name.Trim());
                         DirectoryHandler(fullPath);
-                        processedDirectories.Add(c.id, fullPath);
+                        processedDirectories.Add(c.Id, fullPath);
                         categories.Remove(c);
                     }
                 }
@@ -134,7 +133,7 @@ namespace HelpjuiceConverter
             var hasMoreQuestions = true;
             while (hasMoreQuestions)
             {
-                var url = new Uri("https://" + site + ".helpjuice.com/api/questions?page=" + page + "&api_key=" + key);
+                var url = new UriBuilder("https", $"{site}.helpjuice.com", 443, "/api/questions", $"page={page}&api_key={key}").Uri;
                 var questions = await GetAsync<Question>(client, url);
 
                 if (questions.Count == 0)
@@ -143,44 +142,46 @@ namespace HelpjuiceConverter
                 }
                 else
                 {
-                    Console.WriteLine("Converting " + questions.Count + " questions into files (page " + page.ToString() + ")");
+                    Console.WriteLine($"Converting {questions.Count} questions into files (page {page})");
 
                     foreach (var q in questions)
                     {
-                        var filename = q.name.Trim() + ".md";
-                        filename = filename.Replace("/", " & ");
-                        filename = filename.Replace(Environment.NewLine, " & ");
-                        filename = filename.Replace(":", String.Empty);
-                        if (q.categories.Count > 0)
+                        var filename = $"{q.Name.Trim()}.md"
+                            .Replace("/", " & ")
+                            .Replace(Environment.NewLine, " & ")
+                            .Replace(":", string.Empty);
+
+                        if (q.Categories.Count > 0)
                         {
                             // Might be multiple categories but we'll just take the first
-                            filename = processedDirectories[q.categories[0].id] + "\\" + filename;
+                            filename = Path.Combine(processedDirectories[q.Categories[0].Id], filename);
                         }
                         else
                         {
                             // No category, goes into root
-                            filename = rootPath + filename;
+                            filename = Path.Combine(rootPath, filename);
                         }
 
                         // File contents
-                        var contents = "# " + q.name + Environment.NewLine;
-                        contents += Environment.NewLine;
-                        contents += "**Created At:** " + q.created_at.ToString() + "  " + Environment.NewLine;
-                        contents += "**Updated At:** " + q.updated_at.ToString() + "  " + Environment.NewLine;
-                        contents += Environment.NewLine;
+                        var contents = new StringBuilder();
+                        contents.Append($"# {q.Name}{Environment.NewLine}");
+                        contents.Append(Environment.NewLine);
+                        contents.Append($"**Created At:** {q.CreatedAt} {Environment.NewLine}");
+                        contents.Append($"**Updated At:** {q.UpdatedAt} {Environment.NewLine}");
+                        contents.Append(Environment.NewLine);
 
-                        if (q.tags.Count > 0)
+                        if (q.Tags.Count > 0)
                         {
-                            contents += "**Tags:**" + Environment.NewLine;
-                            foreach (var t in q.tags)
+                            contents.Append($"**Tags:**{Environment.NewLine}");
+                            foreach (var t in q.Tags)
                             {
-                                contents += "<badge text='" + t + "' vertical='middle' />" + Environment.NewLine;
+                                contents.Append($"<badge text='\"{t}\"' vertical='middle' />{Environment.NewLine}");
                             }
                         }
 
-                        FileHandler(filename, contents);
+                        FileHandler(filename, contents.ToString());
 
-                        processedQuestions.Add(q.id, filename);
+                        processedQuestions.Add(q.Id, filename);
                     }
                     page++;
                 }
@@ -194,7 +195,7 @@ namespace HelpjuiceConverter
             var hasMoreAnswers = true;
             while (hasMoreAnswers)
             {
-                var url = new Uri("https://" + site + ".helpjuice.com/api/answers?page=" + page + "&api_key=" + key);
+                var url = new UriBuilder("https", $"{site}.helpjuice.com", 443, "/api/answers", $"page={page}&api_key={key}").Uri;
                 var answers = await GetAsync<Answer>(client, url);
 
                 if (answers.Count == 0)
@@ -203,14 +204,14 @@ namespace HelpjuiceConverter
                 }
                 else
                 {
-                    Console.WriteLine("Converting " + answers.Count + " answers HTML into Markdown files (page " + page.ToString() + ")");
+                    Console.WriteLine($"Converting {answers.Count} answers HTML into Markdown files (page {page})");
 
                     foreach (var a in answers)
                     {
-                        if (processedQuestions.ContainsKey(a.question_id))
+                        if (processedQuestions.ContainsKey(a.QuestionId))
                         {
-                            var filename = processedQuestions[a.question_id];
-                            var content = a.body;
+                            var filename = processedQuestions[a.QuestionId];
+                            var content = a.Body;
                             SanitizeHTML(ref content);
                             FileHandler(filename, markdownConverter.Convert(content));
                         }
@@ -250,7 +251,7 @@ namespace HelpjuiceConverter
                         result = await response.Content.ReadAsAsync<List<T>>();
                         break;
                     default:
-                        throw new NotImplementedException("HTTP Response Content Type " + response.Content.Headers.ContentType.MediaType + " not supported");
+                        throw new NotImplementedException($"HTTP Response Content Type {response.Content.Headers.ContentType.MediaType} not supported");
                 }
             }
 
@@ -291,8 +292,8 @@ namespace HelpjuiceConverter
         static void SanitizeHTML(ref string html)
         {
             // Someone put preformatted code inside a 1x1 table--a lot :|
-            html = html.Replace("<table style=\"width: 100%;\"><tbody><tr><td style=\"width: 100%;\"><pre>", "<pre>");
-            html = html.Replace("</pre></td></tr></tbody></table>", "</pre>");
+            html = html.Replace("<table style=\"width: 100%;\"><tbody><tr><td style=\"width: 100%;\"><pre>", "<pre>")
+                       .Replace("</pre></td></tr></tbody></table>", "</pre>");
         }
     }
 }

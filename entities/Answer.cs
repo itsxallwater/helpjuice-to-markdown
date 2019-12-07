@@ -1,11 +1,11 @@
-using System;
-
 namespace HelpjuiceConverter.Entities
 {
     class Answer
     {
-        public int id { get; set; }
-        public int question_id { get; set; }
-        public string body { get; set; }
+        public int Id { get; set; }
+
+        public int QuestionId { get; set; }
+
+        public string Body { get; set; }
     }
 }
