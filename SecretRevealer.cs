@@ -17,13 +17,11 @@ namespace HelpjuiceConverter
             _secrets = secrets.Value ?? throw new ArgumentNullException(nameof(secrets));
         }
 
-        public Dictionary<string, string> Reveal()
-        {
-            var result = new Dictionary<string, string>();
-            result.Add("JBASE", _secrets.JBASE_API_KEY);
-            result.Add("ZUMASYS", _secrets.ZUMASYS_API_KEY);
-
-            return result;
-        }
+        public Dictionary<string, string> Reveal() =>
+            new Dictionary<string, string>
+            {
+                {"JBASE", _secrets.JBASE_API_KEY },
+                {"ZUMASYS", _secrets.ZUMASYS_API_KEY }
+            };        
     }
 }
