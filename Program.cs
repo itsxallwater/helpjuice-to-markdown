@@ -23,7 +23,7 @@ namespace HelpjuiceConverter
         static Dictionary<int, string> processedDirectories = new Dictionary<int, string>();
         static Dictionary<int, string> processedQuestions = new Dictionary<int, string>();
 
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
             var timer = System.Diagnostics.Stopwatch.StartNew();
 
@@ -31,7 +31,7 @@ namespace HelpjuiceConverter
 
             Console.WriteLine("Converting Docs from HelpJuice to Markdown");
 
-            RunAsync().GetAwaiter().GetResult();
+            await RunAsync();
 
             timer.Stop();
             Console.WriteLine("Processing Completed in " + timer.Elapsed.ToString());
