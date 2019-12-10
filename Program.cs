@@ -9,6 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace HelpjuiceConverter
@@ -98,7 +99,7 @@ namespace HelpjuiceConverter
         static async Task ProcessCategories(string site, string rootPath, string key)
         {
 
-            var url = new UriBuilder("https", $"{site}.helpjuice.com", 443, "/api/categories", $"api_key={key}").Uri;
+            var url = new UriBuilder("https", $"{site}.helpjuice.com", 443, "/api/categories", $"?api_key={key}").Uri;
             var categories = await GetAsync<Category>(client, url);
 
             // Categories have parent/child relationship and unpack to directory/sub-directories
@@ -133,7 +134,7 @@ namespace HelpjuiceConverter
             var hasMoreQuestions = true;
             while (hasMoreQuestions)
             {
-                var url = new UriBuilder("https", $"{site}.helpjuice.com", 443, "/api/questions", $"page={page}&api_key={key}").Uri;
+                var url = new UriBuilder("https", $"{site}.helpjuice.com", 443, "/api/questions", $"?page={page}&api_key={key}").Uri;
                 var questions = await GetAsync<Question>(client, url);
 
                 if (questions.Count == 0)
@@ -166,8 +167,8 @@ namespace HelpjuiceConverter
                         var contents = new StringBuilder();
                         contents.Append($"# {q.Name}{Environment.NewLine}");
                         contents.Append(Environment.NewLine);
-                        contents.Append($"**Created At:** {q.CreatedAt} {Environment.NewLine}");
-                        contents.Append($"**Updated At:** {q.UpdatedAt} {Environment.NewLine}");
+                        contents.Append($"**Created At:** {q.CreatedAt}  {Environment.NewLine}");
+                        contents.Append($"**Updated At:** {q.UpdatedAt}  {Environment.NewLine}");
                         contents.Append(Environment.NewLine);
 
                         if (q.Tags.Count > 0)
@@ -175,7 +176,7 @@ namespace HelpjuiceConverter
                             contents.Append($"**Tags:**{Environment.NewLine}");
                             foreach (var t in q.Tags)
                             {
-                                contents.Append($"<badge text='\"{t}\"' vertical='middle' />{Environment.NewLine}");
+                                contents.Append($"<badge text='{t}' vertical='middle' />{Environment.NewLine}");
                             }
                         }
 
@@ -195,7 +196,7 @@ namespace HelpjuiceConverter
             var hasMoreAnswers = true;
             while (hasMoreAnswers)
             {
-                var url = new UriBuilder("https", $"{site}.helpjuice.com", 443, "/api/answers", $"page={page}&api_key={key}").Uri;
+                var url = new UriBuilder("https", $"{site}.helpjuice.com", 443, "/api/answers", $"?page={page}&api_key={key}").Uri;
                 var answers = await GetAsync<Answer>(client, url);
 
                 if (answers.Count == 0)
@@ -248,7 +249,8 @@ namespace HelpjuiceConverter
                         }
                         break;
                     case "application/json":
-                        result = await response.Content.ReadAsAsync<List<T>>();
+                        var json = await response.Content.ReadAsStringAsync();
+                        result = JsonSerializer.Deserialize<List<T>>(json);
                         break;
                     default:
                         throw new NotImplementedException($"HTTP Response Content Type {response.Content.Headers.ContentType.MediaType} not supported");
