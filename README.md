@@ -23,6 +23,7 @@ Currently program requires that you complete a full conversion; categories, ques
 - [ ] Images should be extracted from HelpJuice and added as local assets, after which the links should be updated
 - [ ] Links need to be tracked and converted
 - [ ] Include link to old document for good measure
+- [ ] Build README.md for each directory that links to sub-directories and articles
 
 ## Dependencies
 
