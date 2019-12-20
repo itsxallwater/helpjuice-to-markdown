@@ -20,7 +20,10 @@ Currently program requires that you complete a full conversion; categories, ques
 - [x] Answers can then be retrieved but the down side is they are returned as CSV or XLS
 - [x] Will need to add a CSV parser to turn the download into a List<Answer>
 - [x] Once parsed, will need an HTML -> Markdown converter to convert and save the output to the appropriate file
-- [ ] Images should be extracted from HelpJuice and added as local assets, after which the links should be updated
+- [x] Images should be extracted from HelpJuice and added as local assets, after which the links should be updated
+- [x] Blob images not working correctly, not all docs rendering correctly
+- [x] Convert articles as files to folders w/ content in README.md & related images saved within
+- [x] Lower case folders and files
 - [ ] Links need to be tracked and converted
 - [ ] Include link to old document for good measure
 - [ ] Build README.md for each directory that links to sub-directories and articles

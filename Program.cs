@@ -10,14 +10,19 @@ using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace HelpjuiceConverter
 {
     class Program
     {
+        static readonly string _outputRoot = "Docs";
+        static readonly string _outputAssetRoot = "..\\..\\..\\.vuepress\\public";
+
         static IConfigurationRoot Configuration { get; set; }
         static HttpClient client = new HttpClient();
+        static HttpClient downloader = new HttpClient();
         static Converter markdownConverter;
         static Dictionary<string, string> secrets = new Dictionary<string, string>();
         static Dictionary<int, string> processedDirectories = new Dictionary<int, string>();
@@ -83,7 +88,7 @@ namespace HelpjuiceConverter
         {
             Console.WriteLine($"Processing for {site}");
 
-            var rootPath = Path.Combine(Path.GetTempPath(), "Docs", site);
+            var rootPath = Path.Combine(Path.GetTempPath(), _outputRoot, site.ToLower());
             DirectoryHandler(rootPath);
 
             var key = secrets[site];
@@ -118,7 +123,7 @@ namespace HelpjuiceConverter
                             basePath = processedDirectories[c.ParentId.Value];
                         }
 
-                        var fullPath = Path.Combine(basePath, c.Name.Trim());
+                        var fullPath = Path.Combine(basePath, c.Name.Trim()).Replace(" ", "-").ToLower();
                         DirectoryHandler(fullPath);
                         processedDirectories.Add(c.Id, fullPath);
                         categories.Remove(c);
@@ -127,7 +132,7 @@ namespace HelpjuiceConverter
             }
         }
 
-        // Process HelpJuice Questions into markdown files
+        // Process HelpJuice Questions into question-name-as-folder/README.md
         static async Task ProcessQuestions(string site, string rootPath, string key)
         {
             var page = 1;
@@ -147,10 +152,12 @@ namespace HelpjuiceConverter
 
                     foreach (var q in questions)
                     {
-                        var filename = $"{q.Name.Trim()}.md"
-                            .Replace("/", " & ")
-                            .Replace(Environment.NewLine, " & ")
-                            .Replace(":", string.Empty);
+                        var filename = q.Name.Trim()
+                            .Replace("/", "&")
+                            .Replace(Environment.NewLine, "&")
+                            .Replace(":", string.Empty)
+                            .Replace(" ", "-")
+                            .ToLower();
 
                         if (q.Categories.Count > 0)
                         {
@@ -162,6 +169,11 @@ namespace HelpjuiceConverter
                             // No category, goes into root
                             filename = Path.Combine(rootPath, filename);
                         }
+
+                        // At this point, filename = the folder to build out for the question
+                        DirectoryHandler(filename);
+                        // Put the actual question content into a README.md within that folder
+                        filename = Path.Combine(filename, "README.md");
 
                         // File contents
                         var contents = new StringBuilder();
@@ -214,6 +226,7 @@ namespace HelpjuiceConverter
                             var filename = processedQuestions[a.QuestionId];
                             var content = a.Body;
                             SanitizeHTML(ref content);
+                            content = await ImageHandler(filename, a.QuestionId, content);
                             FileHandler(filename, markdownConverter.Convert(content));
                         }
                     }
@@ -260,7 +273,6 @@ namespace HelpjuiceConverter
             return result;
         }
 
-
         // Helper method for writing out directories
         static void DirectoryHandler(string path)
         {
@@ -288,6 +300,64 @@ namespace HelpjuiceConverter
             {
                 stream.Write(contents);
             }
+        }
+
+        // Helper method to extract and download images + update src paths
+        static async Task<string> ImageHandler(string filename, int questionId, string html)
+        {
+            var pattern = @"<img.+?src=[\""'](.+?)[\""'].+?>";
+            var rgx = new Regex(pattern, RegexOptions.IgnoreCase);
+            var matches = rgx.Matches(html);
+
+            for (var i = 0; i < matches.Count; i++)
+            {
+                // Take src from img tag
+                var oldSrc = matches[i].Groups[1].Value;
+                // Zumasys hacks! Not all images are coming from HelpJuice
+                if (!oldSrc.Contains("s3.amazonaws.com"))
+                {
+                    if (oldSrc.Contains("http://www.jbase.com/r5"))
+                    {
+                        oldSrc = oldSrc.Replace("http://www.jbase.com/r5", "https://static.zumasys.com/jbase/r99");
+                    }
+
+                    // Parse img name converting spaces to hyphens and lower casing
+                    var imageName = Path.GetFileName(oldSrc)
+                        .Replace(" ", "-")
+                        .Replace("%20", "-")
+                        .ToLower();
+
+                    // Default blob files/extension-less files to jpg
+                    if (Path.GetExtension(imageName).Equals(String.Empty))
+                    {
+                        imageName = Path.ChangeExtension(imageName, ".jpg");
+                    }
+
+                    // Construct new image src
+                    var newSrc = Path.Combine(Path.GetDirectoryName(filename), imageName);
+
+                    // Download image
+                    try
+                    {
+                        var imageBytes = await downloader.GetByteArrayAsync(new Uri(oldSrc));
+
+                        // Save image
+                        await File.WriteAllBytesAsync(newSrc, imageBytes);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.Message);
+                    }
+                    finally
+                    {
+                        // Update src in html
+                        newSrc = "./" + Path.GetRelativePath(Path.GetDirectoryName(filename), newSrc);
+                        html = html.Replace(oldSrc, newSrc);
+                    }
+                }
+            }
+
+            return html;
         }
 
         // Helper method for cleaning inbound HTML
