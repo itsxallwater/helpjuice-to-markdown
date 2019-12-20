@@ -18,15 +18,13 @@ namespace HelpjuiceConverter
     class Program
     {
         static readonly string _outputRoot = "Docs";
-        static readonly string _outputAssetRoot = "..\\..\\..\\.vuepress\\public";
-
         static IConfigurationRoot Configuration { get; set; }
         static HttpClient client = new HttpClient();
         static HttpClient downloader = new HttpClient();
         static Converter markdownConverter;
         static Dictionary<string, string> secrets = new Dictionary<string, string>();
-        static Dictionary<int, string> processedDirectories = new Dictionary<int, string>();
-        static Dictionary<int, string> processedQuestions = new Dictionary<int, string>();
+        static Dictionary<int, Category> processedCategories = new Dictionary<int, Category>();
+        static Dictionary<int, Question> processedQuestions = new Dictionary<int, Question>();
 
         static async Task Main(string[] args)
         {
@@ -96,7 +94,7 @@ namespace HelpjuiceConverter
             await ProcessQuestions(site, rootPath, key);
             await ProcessAnswers(site, rootPath, key);
 
-            processedDirectories.Clear();
+            processedCategories.Clear();
             processedQuestions.Clear();
         }
 
@@ -115,17 +113,18 @@ namespace HelpjuiceConverter
                 var tempCategories = new List<Category>(categories);
                 foreach (var c in tempCategories)
                 {
-                    if (c.ParentId == null || (c.ParentId != null && processedDirectories.ContainsKey(c.ParentId.Value)))
+                    if (c.ParentId == null || (c.ParentId != null && processedCategories.ContainsKey(c.ParentId.Value)))
                     {
                         var basePath = rootPath;
                         if (c.ParentId != null)
                         {
-                            basePath = processedDirectories[c.ParentId.Value];
+                            basePath = processedCategories[c.ParentId.Value].LocalPath;
                         }
 
                         var fullPath = Path.Combine(basePath, c.Name.Trim()).Replace(" ", "-").ToLower();
                         DirectoryHandler(fullPath);
-                        processedDirectories.Add(c.Id, fullPath);
+                        c.LocalPath = fullPath;
+                        processedCategories.Add(c.Id, c);
                         categories.Remove(c);
                     }
                 }
@@ -159,10 +158,12 @@ namespace HelpjuiceConverter
                             .Replace(" ", "-")
                             .ToLower();
 
+                        var category = new Category();
                         if (q.Categories.Count > 0)
                         {
                             // Might be multiple categories but we'll just take the first
-                            filename = Path.Combine(processedDirectories[q.Categories[0].Id], filename);
+                            category = processedCategories[q.Categories[0].Id];
+                            filename = Path.Combine(category.LocalPath, filename);
                         }
                         else
                         {
@@ -176,25 +177,35 @@ namespace HelpjuiceConverter
                         filename = Path.Combine(filename, "README.md");
 
                         // File contents
-                        var contents = new StringBuilder();
-                        contents.Append($"# {q.Name}{Environment.NewLine}");
-                        contents.Append(Environment.NewLine);
-                        contents.Append($"**Created At:** {q.CreatedAt}  {Environment.NewLine}");
-                        contents.Append($"**Updated At:** {q.UpdatedAt}  {Environment.NewLine}");
-                        contents.Append(Environment.NewLine);
+                        var originalUrl = new StringBuilder()
+                            .Append($"https://docs.{site.ToLower()}.com/");
+                        if (category.CodeName != String.Empty)
+                        {
+                            originalUrl.Append(category.CodeName)
+                                .Append("/");
+                        }
+                        originalUrl.Append(q.CodeName);
+
+                        var content = new StringBuilder()
+                            .Append($"# {q.Name}{Environment.NewLine}")
+                            .Append(Environment.NewLine)
+                            .Append($"**Created At:** {q.CreatedAt}  {Environment.NewLine}")
+                            .Append($"**Updated At:** {q.UpdatedAt}  {Environment.NewLine}")
+                            .Append($"**Original Doc:** [{q.CodeName}]({originalUrl})  {Environment.NewLine}")
+                            .Append(Environment.NewLine);
 
                         if (q.Tags.Count > 0)
                         {
-                            contents.Append($"**Tags:**{Environment.NewLine}");
+                            content.Append($"**Tags:**{Environment.NewLine}");
                             foreach (var t in q.Tags)
                             {
-                                contents.Append($"<badge text='{t}' vertical='middle' />{Environment.NewLine}");
+                                content.Append($"<badge text='{t}' vertical='middle' />{Environment.NewLine}");
                             }
                         }
 
-                        FileHandler(filename, contents.ToString());
-
-                        processedQuestions.Add(q.Id, filename);
+                        FileHandler(filename, content.ToString());
+                        q.LocalPath = filename;
+                        processedQuestions.Add(q.Id, q);
                     }
                     page++;
                 }
@@ -223,7 +234,7 @@ namespace HelpjuiceConverter
                     {
                         if (processedQuestions.ContainsKey(a.QuestionId))
                         {
-                            var filename = processedQuestions[a.QuestionId];
+                            var filename = processedQuestions[a.QuestionId].LocalPath;
                             var content = a.Body;
                             SanitizeHTML(ref content);
                             content = await ImageHandler(filename, a.QuestionId, content);

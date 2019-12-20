@@ -82,5 +82,10 @@ namespace HelpjuiceConverter.Entities
         [JsonPropertyName("tags")]
         [Name("tags")]
         public List<string> Tags { get; set; }
+
+        // The local path this Question was mapped to
+        [JsonIgnore]
+        [Ignore]
+        public string LocalPath { get; set; }
     }
 }

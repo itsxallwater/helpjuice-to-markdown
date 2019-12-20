@@ -16,5 +16,10 @@ namespace HelpjuiceConverter.Entities
         [JsonPropertyName("body")]
         [Name("body")]
         public string Body { get; set; }
+
+        // The local path this Category was mapped to
+        [JsonIgnore]
+        [Ignore]
+        public string LocalPath { get; set; }
     }
 }

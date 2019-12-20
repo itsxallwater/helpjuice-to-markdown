@@ -33,5 +33,10 @@ namespace HelpjuiceConverter.Entities
         [JsonPropertyName("url")]
         [Name("url")]
         public Uri Url { get; set; }
+
+        // The local path this Category was mapped to
+        [JsonIgnore]
+        [Ignore]
+        public string LocalPath { get; set; }
     }
 }
