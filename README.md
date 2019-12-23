@@ -26,7 +26,7 @@ Currently program requires that you complete a full conversion; categories, ques
 - [x] Lower case folders and files
 - [ ] Links need to be tracked and converted
 - [x] Include link to old document for good measure
-- [ ] Build README.md for each directory that links to sub-directories and articles
+- [x] Build README.md for each directory that links to sub-directories and articles
 
 ## Dependencies
 
