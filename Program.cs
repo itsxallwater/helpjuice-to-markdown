@@ -237,7 +237,7 @@ namespace HelpjuiceConverter
                             var filename = processedQuestions[a.QuestionId].LocalPath;
                             var content = a.Body;
                             SanitizeHTML(ref content);
-                            content = await ImageHandler(filename, a.QuestionId, content);
+                            content = await ImageHandler(filename, processedQuestions[a.QuestionId].CodeName, content);
                             FileHandler(filename, markdownConverter.Convert(content));
                         }
                     }
@@ -314,7 +314,7 @@ namespace HelpjuiceConverter
         }
 
         // Helper method to extract and download images + update src paths
-        static async Task<string> ImageHandler(string filename, int questionId, string html)
+        static async Task<string> ImageHandler(string filename, string title, string html)
         {
             var pattern = @"<img.+?src=[\""'](.+?)[\""'].+?>";
             var rgx = new Regex(pattern, RegexOptions.IgnoreCase);
@@ -362,8 +362,11 @@ namespace HelpjuiceConverter
                     finally
                     {
                         // Update src in html
-                        newSrc = "./" + Path.GetRelativePath(Path.GetDirectoryName(filename), newSrc);
-                        html = html.Replace(oldSrc, newSrc);
+                        var newImageAttrs = new StringBuilder("./")
+                            .Append(Path.GetRelativePath(Path.GetDirectoryName(filename), newSrc))
+                            // See if we can force in an attribute that the Markdown parser will grab for alt text
+                            .Append($"\" alt=\"{title}: {Path.GetFileNameWithoutExtension(imageName)}");
+                        html = html.Replace(oldSrc, newImageAttrs.ToString());
                     }
                 }
             }
