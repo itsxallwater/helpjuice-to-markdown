@@ -94,6 +94,8 @@ namespace HelpjuiceConverter
             await ProcessQuestions(site, rootPath, key);
             await ProcessAnswers(site, rootPath, key);
 
+            CreateBaseReadmes(site, rootPath);
+
             processedCategories.Clear();
             processedQuestions.Clear();
         }
@@ -282,6 +284,46 @@ namespace HelpjuiceConverter
             }
 
             return result;
+        }
+
+        // Scan created Directories and create TOC-like base README.md files as needed
+        static void CreateBaseReadmes(string site, string rootPath)
+        {
+            Console.WriteLine($"Creating base/TOC README.md files for {site}");
+
+            CreateReadme(rootPath, site);
+
+            foreach (var pc in processedCategories)
+            {
+                CreateReadme(pc.Value.LocalPath, pc.Value.Name);
+            }
+        }
+
+        static void CreateReadme(string localPath, string name)
+        {
+            var filename = Path.Combine(localPath, "README.md");
+            if (!File.Exists(filename))
+            {
+                // Build the README content
+                var content = new StringBuilder()
+                    .Append($"# {name}{Environment.NewLine}")
+                    .Append(Environment.NewLine)
+                    .Append("## Topics")
+                    .Append(Environment.NewLine)
+                    .Append(Environment.NewLine);
+
+                // Include links to sub-directories
+                var children = Directory.GetDirectories(localPath);
+                foreach (var c in children)
+                {
+                    var relativePath = Path.GetRelativePath(localPath, c);
+                    content.Append($"[{relativePath}](./{relativePath})  {Environment.NewLine}");
+                }
+
+                content.Append(Environment.NewLine);
+
+                FileHandler(filename, content.ToString());
+            }
         }
 
         // Helper method for writing out directories
