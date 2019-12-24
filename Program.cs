@@ -25,6 +25,7 @@ namespace HelpjuiceConverter
         static Dictionary<string, string> secrets = new Dictionary<string, string>();
         static Dictionary<int, Category> processedCategories = new Dictionary<int, Category>();
         static Dictionary<int, Question> processedQuestions = new Dictionary<int, Question>();
+        static StringBuilder unconvertedLinks = new StringBuilder();
 
         static async Task Main(string[] args)
         {
@@ -96,8 +97,10 @@ namespace HelpjuiceConverter
 
             CreateBaseReadmes(site, rootPath);
 
-            processedCategories.Clear();
-            processedQuestions.Clear();
+            // If you have question IDs that are not unique to a site you'll need to clear
+            // Had to disable these because we have links on docs in siteA to docs in siteB
+            //processedCategories.Clear();
+            //processedQuestions.Clear();
         }
 
         // Process HelpJuice Categories into directories
@@ -156,7 +159,7 @@ namespace HelpjuiceConverter
                         var filename = q.Name.Trim()
                             .Replace("/", "&")
                             .Replace(Environment.NewLine, "&")
-                            .Replace(":", string.Empty)
+                            .Replace(":", String.Empty)
                             .Replace(" ", "-")
                             .ToLower();
 
@@ -181,7 +184,7 @@ namespace HelpjuiceConverter
                         // File contents
                         var originalUrl = new StringBuilder()
                             .Append($"https://docs.{site.ToLower()}.com/");
-                        if (category.CodeName != String.Empty)
+                        if (!String.IsNullOrEmpty(category.CodeName))
                         {
                             originalUrl.Append(category.CodeName)
                                 .Append("/");
@@ -240,6 +243,10 @@ namespace HelpjuiceConverter
                             var content = a.Body;
                             SanitizeHTML(ref content);
                             content = await ImageHandler(filename, processedQuestions[a.QuestionId].CodeName, content);
+                            // if (a.QuestionId.Equals(260514))
+                            // {
+                            LinkHandler(filename, ref content);
+                            // }
                             FileHandler(filename, markdownConverter.Convert(content));
                         }
                     }
@@ -253,7 +260,15 @@ namespace HelpjuiceConverter
         {
             foreach (var site in secrets)
             {
+                // if (site.Key.Equals("zumasys", StringComparison.CurrentCultureIgnoreCase))
+                // {
                 await ProcessSite(site.Key);
+                // }
+            }
+
+            if (unconvertedLinks.Length > 0)
+            {
+                FileHandler(Path.Combine(Path.GetTempPath(), _outputRoot, "Links.txt"), unconvertedLinks.ToString());
             }
         }
 
@@ -299,6 +314,7 @@ namespace HelpjuiceConverter
             }
         }
 
+        // Helper method for creating a base README.md
         static void CreateReadme(string localPath, string name)
         {
             var filename = Path.Combine(localPath, "README.md");
@@ -371,7 +387,10 @@ namespace HelpjuiceConverter
                 {
                     if (oldSrc.Contains("http://www.jbase.com/r5"))
                     {
-                        oldSrc = oldSrc.Replace("http://www.jbase.com/r5", "https://static.zumasys.com/jbase/r99");
+                        oldSrc = oldSrc.Replace("http://www.jbase.com/r5", "https://static.zumasys.com/jbase/r99")
+                                        .Replace("http://jbase.com/r5", "https://static.zumasys.com/jbase/r99")
+                                        .Replace("https://jbase.com/r5", "https://static.zumasys.com/jbase/r99")
+                                        .Replace("www.jbase.com/r5", "https://static.zumasys.com/jbase/r99");
                     }
 
                     // Parse img name converting spaces to hyphens and lower casing
@@ -381,7 +400,7 @@ namespace HelpjuiceConverter
                         .ToLower();
 
                     // Default blob files/extension-less files to jpg
-                    if (Path.GetExtension(imageName).Equals(String.Empty))
+                    if (String.IsNullOrEmpty(Path.GetExtension(imageName)))
                     {
                         imageName = Path.ChangeExtension(imageName, ".jpg");
                     }
@@ -414,6 +433,110 @@ namespace HelpjuiceConverter
             }
 
             return html;
+        }
+
+        // Helper method to ensure links have proper targets
+        static void LinkHandler(string filename, ref string html)
+        {
+            var pattern = @"<a.+?href=[\""'](.+?)[\""'].+?>";
+            var rgx = new Regex(pattern, RegexOptions.IgnoreCase);
+            var matches = rgx.Matches(html);
+
+            for (var i = 0; i < matches.Count; i++)
+            {
+                // Take href from a tag
+                var oldTag = matches[i];
+                var oldTarget = oldTag.Groups[1].Value;
+
+                // Zumasys hacks! Some external links were to an old jBASE path that no longer exists
+                if (oldTarget.Contains("jbase.com/r5") || oldTarget.Contains("jbase.com/r99"))
+                {
+
+                    var newTarget = oldTarget.Replace("http://www.jbase.com/r5", "https://static.zumasys.com/jbase/r99")
+                                            .Replace("http://jbase.com/r5", "https://static.zumasys.com/jbase/r99")
+                                            .Replace("https://jbase.com/r5", "https://static.zumasys.com/jbase/r99")
+                                            .Replace("www.jbase.com/r5", "https://static.zumasys.com/jbase/r99")
+                                            .Replace("http://www.jbase.com/r99", "https://static.zumasys.com/jbase/r99")
+                                            .Replace("http://jbase.com/r99", "https://static.zumasys.com/jbase/r99")
+                                            .Replace("https://jbase.com/r99", "https://static.zumasys.com/jbase/r99")
+                                            .Replace("www.jbase.com/r99", "https://static.zumasys.com/jbase/r99");
+                    html = html.Replace(oldTarget, newTarget);
+                }
+                else
+                {
+                    var coreTarget = Path.GetFileNameWithoutExtension(oldTarget).Replace("%20", String.Empty);
+                    var localPath = String.Empty;
+                    int questionId, categoryId;
+
+                    // First see if link target is a record in processedQuestions where Target equals CodeName
+                    localPath = processedQuestions.Where(q => q.Value.CodeName.Equals(coreTarget, StringComparison.CurrentCultureIgnoreCase))
+                                                   .Select(q => q.Value.LocalPath)
+                                                   .FirstOrDefault();
+
+                    // If we didn't find a match, next try and find a valid question ID in the target
+                    if (String.IsNullOrEmpty(localPath) && coreTarget.Contains("-"))
+                    {
+                        var foundQuestionId = Int32.TryParse(coreTarget.Substring(0, coreTarget.IndexOf('-')), out questionId);
+                        if (foundQuestionId && processedQuestions.ContainsKey(questionId))
+                        {
+                            localPath = processedQuestions[questionId].LocalPath;
+                        }
+                    }
+
+                    // If we still don't have a match, try and find based on the processedCategories where Target equals CodeName
+                    if (String.IsNullOrEmpty(localPath))
+                    {
+                        localPath = processedCategories.Where(c => c.Value.CodeName.Equals(coreTarget, StringComparison.CurrentCultureIgnoreCase))
+                                                        .Select(c => c.Value.LocalPath)
+                                                        .FirstOrDefault();
+                    }
+
+                    // If we still didn't find a match, next try and find a valid category ID in the target
+                    if (String.IsNullOrEmpty(localPath) && coreTarget.Contains("-"))
+                    {
+                        var foundCategoryId = Int32.TryParse(coreTarget.Substring(0, coreTarget.IndexOf('-')), out categoryId);
+                        if (foundCategoryId && processedCategories.ContainsKey(categoryId))
+                        {
+                            localPath = processedCategories[categoryId].LocalPath;
+                        }
+                    }
+
+                    // If we still don't have a match, try and find based on the path -- hold on to your horses :|
+                    // if (String.IsNullOrEmpty(localPath))
+                    // {
+                    //     // Yuck!
+                    //     question = processedQuestions.Where(q => (new DirectoryInfo(q.Value.LocalPath).Name
+                    //                                     .Replace("-", String.Empty)
+                    //                                     .Replace("_", String.Empty)
+                    //                                     .Replace("&", String.Empty)
+                    //                                     .Replace("@", String.Empty)
+                    //                                     .Replace(".", String.Empty)
+                    //                                     .Contains(coreTarget
+                    //                                         .Replace("-", String.Empty)
+                    //                                         .Replace("_", String.Empty)
+                    //                                         .Replace("&", String.Empty)
+                    //                                         .Replace("@", String.Empty)
+                    //                                         .Replace(".", String.Empty)
+                    //                                     )))
+                    //                                 .Select(q => (Question)q.Value)
+                    //                                 .FirstOrDefault();
+                    // }
+
+                    if (!String.IsNullOrEmpty(localPath))
+                    {
+                        var newPath = new StringBuilder(Path.GetRelativePath(Path.GetDirectoryName(filename), Path.GetDirectoryName(localPath)))
+                            .Replace(@"\", "/")
+                            .Insert(0, "./");
+                        // Take care to only replace the link
+                        var newTag = oldTag.Value.Replace(oldTarget, newPath.ToString());
+                        html = html.Replace(oldTag.Value, newTag);
+                    }
+                    else
+                    {
+                        unconvertedLinks.Append($"{oldTarget}{Environment.NewLine}");
+                    }
+                }
+            }
         }
 
         // Helper method for cleaning inbound HTML

@@ -25,6 +25,9 @@ Currently program requires that you complete a full conversion; categories, ques
 - [x] Convert articles as files to folders w/ content in README.md & related images saved within
 - [x] Lower case folders and files
 - [ ] Links need to be tracked and converted
+- [ ] Check external links for validity
+- [ ] Output failed link conversions to text doc
+- [ ] Output failed images to text doc
 - [x] Include link to old document for good measure
 - [x] Build README.md for each directory that links to sub-directories and articles
 
