@@ -470,7 +470,7 @@ namespace HelpjuiceConverter
 
                     // First see if link target is a record in processedQuestions where Target equals CodeName
                     localPath = processedQuestions.Where(q => q.Value.CodeName.Equals(coreTarget, StringComparison.CurrentCultureIgnoreCase))
-                                                   .Select(q => q.Value.LocalPath)
+                                                   .Select(q => Path.GetDirectoryName(q.Value.LocalPath))
                                                    .FirstOrDefault();
 
                     // If we didn't find a match, next try and find a valid question ID in the target
@@ -479,25 +479,7 @@ namespace HelpjuiceConverter
                         var foundQuestionId = Int32.TryParse(coreTarget.Substring(0, coreTarget.IndexOf('-')), out questionId);
                         if (foundQuestionId && processedQuestions.ContainsKey(questionId))
                         {
-                            localPath = processedQuestions[questionId].LocalPath;
-                        }
-                    }
-
-                    // If we still don't have a match, try and find based on the processedCategories where Target equals CodeName
-                    if (String.IsNullOrEmpty(localPath))
-                    {
-                        localPath = processedCategories.Where(c => c.Value.CodeName.Equals(coreTarget, StringComparison.CurrentCultureIgnoreCase))
-                                                        .Select(c => c.Value.LocalPath)
-                                                        .FirstOrDefault();
-                    }
-
-                    // If we still didn't find a match, next try and find a valid category ID in the target
-                    if (String.IsNullOrEmpty(localPath) && coreTarget.Contains("-"))
-                    {
-                        var foundCategoryId = Int32.TryParse(coreTarget.Substring(0, coreTarget.IndexOf('-')), out categoryId);
-                        if (foundCategoryId && processedCategories.ContainsKey(categoryId))
-                        {
-                            localPath = processedCategories[categoryId].LocalPath;
+                            localPath = Path.GetDirectoryName(processedQuestions[questionId].LocalPath);
                         }
                     }
 
@@ -520,11 +502,29 @@ namespace HelpjuiceConverter
                     //                                     )))
                     //                                 .Select(q => (Question)q.Value)
                     //                                 .FirstOrDefault();
-                    // }
+                    // }                    
+
+                    // If we still don't have a match, try and find based on the processedCategories where Target equals CodeName
+                    if (String.IsNullOrEmpty(localPath))
+                    {
+                        localPath = processedCategories.Where(c => c.Value.CodeName.Equals(coreTarget, StringComparison.CurrentCultureIgnoreCase))
+                                                        .Select(c => c.Value.LocalPath)
+                                                        .FirstOrDefault();
+                    }
+
+                    // If we still didn't find a match, next try and find a valid category ID in the target
+                    if (String.IsNullOrEmpty(localPath) && coreTarget.Contains("-"))
+                    {
+                        var foundCategoryId = Int32.TryParse(coreTarget.Substring(0, coreTarget.IndexOf('-')), out categoryId);
+                        if (foundCategoryId && processedCategories.ContainsKey(categoryId))
+                        {
+                            localPath = processedCategories[categoryId].LocalPath;
+                        }
+                    }
 
                     if (!String.IsNullOrEmpty(localPath))
                     {
-                        var newPath = new StringBuilder(Path.GetRelativePath(Path.GetDirectoryName(filename), Path.GetDirectoryName(localPath)))
+                        var newPath = new StringBuilder(Path.GetRelativePath(Path.GetDirectoryName(filename), localPath))
                             .Replace(@"\", "/")
                             .Insert(0, "./");
                         // Take care to only replace the link
