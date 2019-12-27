@@ -163,12 +163,21 @@ namespace HelpjuiceConverter
                             .Replace(" ", "-")
                             .ToLower();
 
+                        var originalUrl = new StringBuilder()
+                            .Append($"https://docs.{site.ToLower()}.com/");
+
                         var category = new Category();
                         if (q.Categories.Count > 0)
                         {
                             // Might be multiple categories but we'll just take the first
                             category = processedCategories[q.Categories[0].Id];
                             filename = Path.Combine(category.LocalPath, filename);
+
+                            if (!String.IsNullOrEmpty(category.CodeName))
+                            {
+                                originalUrl.Append(category.CodeName)
+                                    .Append("/");
+                            }
                         }
                         else
                         {
@@ -180,23 +189,17 @@ namespace HelpjuiceConverter
                         DirectoryHandler(filename);
                         // Put the actual question content into a README.md within that folder
                         filename = Path.Combine(filename, "README.md");
-
-                        // File contents
-                        var originalUrl = new StringBuilder()
-                            .Append($"https://docs.{site.ToLower()}.com/");
-                        if (!String.IsNullOrEmpty(category.CodeName))
-                        {
-                            originalUrl.Append(category.CodeName)
-                                .Append("/");
-                        }
                         originalUrl.Append(q.CodeName);
 
+                        // File contents
                         var content = new StringBuilder()
                             .Append($"# {q.Name}{Environment.NewLine}")
                             .Append(Environment.NewLine)
                             .Append($"**Created At:** {q.CreatedAt}  {Environment.NewLine}")
                             .Append($"**Updated At:** {q.UpdatedAt}  {Environment.NewLine}")
                             .Append($"**Original Doc:** [{q.CodeName}]({originalUrl})  {Environment.NewLine}")
+                            .Append($"**Original ID:** {q.Id}  {Environment.NewLine}")
+                            .Append($"**Internal:** {(q.Accessibility.Equals(0) ? "Yes" : "No")}  {Environment.NewLine}")
                             .Append(Environment.NewLine);
 
                         if (q.Tags.Count > 0)
