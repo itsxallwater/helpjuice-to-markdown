@@ -247,7 +247,7 @@ namespace HelpjuiceConverter
                             var content = a.Body;
                             SanitizeHTML(ref content);
                             content = await ImageHandler(filename, processedQuestions[a.QuestionId].CodeName, content);
-                            // if (a.QuestionId.Equals(278162))
+                            // if (a.QuestionId.Equals(277711))
                             // {
                             LinkHandler(filename, ref content);
                             // }
@@ -477,7 +477,10 @@ namespace HelpjuiceConverter
                 }
                 else
                 {
-                    var coreTarget = Path.GetFileNameWithoutExtension(oldTarget).Replace("%20", String.Empty);
+                    var coreTarget = Path.GetFileNameWithoutExtension(oldTarget)
+                        .Replace("%20", String.Empty)
+                        .Replace(".html", String.Empty)
+                        .Replace(".htm", String.Empty);
                     // If the target contains an in-document anchor link, strip out for our question and category searches
                     var anchorTarget = String.Empty;
                     if (coreTarget.Contains("#"))
