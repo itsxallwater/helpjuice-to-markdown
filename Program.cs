@@ -25,7 +25,8 @@ namespace HelpjuiceConverter
         static Dictionary<string, string> secrets = new Dictionary<string, string>();
         static Dictionary<int, Category> processedCategories = new Dictionary<int, Category>();
         static Dictionary<int, Question> processedQuestions = new Dictionary<int, Question>();
-        static StringBuilder unconvertedLinks = new StringBuilder();
+        static HashSet<string> unconvertedImages = new HashSet<string>();
+        static HashSet<string> unconvertedLinks = new HashSet<string>();
 
         static async Task Main(string[] args)
         {
@@ -246,7 +247,7 @@ namespace HelpjuiceConverter
                             var content = a.Body;
                             SanitizeHTML(ref content);
                             content = await ImageHandler(filename, processedQuestions[a.QuestionId].CodeName, content);
-                            // if (a.QuestionId.Equals(444208))
+                            // if (a.QuestionId.Equals(278162))
                             // {
                             LinkHandler(filename, ref content);
                             // }
@@ -269,10 +270,10 @@ namespace HelpjuiceConverter
                 // }
             }
 
-            if (unconvertedLinks.Length > 0)
-            {
-                FileHandler(Path.Combine(Path.GetTempPath(), _outputRoot, "Links.txt"), unconvertedLinks.ToString());
-            }
+            var outputPath = Path.Combine(Path.GetTempPath(), _outputRoot);
+
+            FileHandler(Path.Combine(outputPath, "Images.txt"), string.Join(Environment.NewLine, unconvertedImages));
+            FileHandler(Path.Combine(outputPath, "Links.txt"), string.Join(Environment.NewLine, unconvertedLinks));
         }
 
         // Helper method for calling APIs
@@ -421,7 +422,8 @@ namespace HelpjuiceConverter
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine(ex.Message);
+                        Console.WriteLine($"{oldSrc} - {ex.Message}");
+                        unconvertedImages.Add(oldSrc);
                     }
                     finally
                     {
@@ -432,6 +434,10 @@ namespace HelpjuiceConverter
                             .Append($"\" alt=\"{title}: {Path.GetFileNameWithoutExtension(imageName)}");
                         html = html.Replace(oldSrc, newImageAttrs.ToString());
                     }
+                }
+                else
+                {
+                    unconvertedImages.Add(oldSrc);
                 }
             }
 
@@ -467,11 +473,19 @@ namespace HelpjuiceConverter
                 } // Try and filter out non-HelpJuice links
                 else if (oldTarget.Contains("http") && (!oldTarget.Contains("zumasys") && !oldTarget.Contains("jbase")))
                 {
-                    unconvertedLinks.Append($"{oldTarget}{Environment.NewLine}");
+                    unconvertedLinks.Add(oldTarget);
                 }
                 else
                 {
                     var coreTarget = Path.GetFileNameWithoutExtension(oldTarget).Replace("%20", String.Empty);
+                    // If the target contains an in-document anchor link, strip out for our question and category searches
+                    var anchorTarget = String.Empty;
+                    if (coreTarget.Contains("#"))
+                    {
+                        var anchorIndex = coreTarget.IndexOf("#");
+                        anchorTarget = coreTarget.Substring(anchorIndex, coreTarget.Length - anchorIndex);
+                        coreTarget = coreTarget.Substring(0, anchorIndex);
+                    }
                     var localPath = String.Empty;
                     int questionId, categoryId;
 
@@ -489,27 +503,6 @@ namespace HelpjuiceConverter
                             localPath = Path.GetDirectoryName(processedQuestions[questionId].LocalPath);
                         }
                     }
-
-                    // If we still don't have a match, try and find based on the path -- hold on to your horses :|
-                    // if (String.IsNullOrEmpty(localPath))
-                    // {
-                    //     // Yuck!
-                    //     question = processedQuestions.Where(q => (new DirectoryInfo(q.Value.LocalPath).Name
-                    //                                     .Replace("-", String.Empty)
-                    //                                     .Replace("_", String.Empty)
-                    //                                     .Replace("&", String.Empty)
-                    //                                     .Replace("@", String.Empty)
-                    //                                     .Replace(".", String.Empty)
-                    //                                     .Contains(coreTarget
-                    //                                         .Replace("-", String.Empty)
-                    //                                         .Replace("_", String.Empty)
-                    //                                         .Replace("&", String.Empty)
-                    //                                         .Replace("@", String.Empty)
-                    //                                         .Replace(".", String.Empty)
-                    //                                     )))
-                    //                                 .Select(q => (Question)q.Value)
-                    //                                 .FirstOrDefault();
-                    // }                    
 
                     // If we still don't have a match, try and find based on the processedCategories where Target equals CodeName
                     if (String.IsNullOrEmpty(localPath))
@@ -531,6 +524,10 @@ namespace HelpjuiceConverter
 
                     if (!String.IsNullOrEmpty(localPath))
                     {
+                        if (!String.IsNullOrEmpty(anchorTarget))
+                        {
+                            localPath = $"{localPath}{anchorTarget}";
+                        }
                         var newPath = new StringBuilder(Path.GetRelativePath(Path.GetDirectoryName(filename), localPath))
                             .Replace(@"\", "/")
                             .Insert(0, "./");
@@ -540,7 +537,7 @@ namespace HelpjuiceConverter
                     }
                     else
                     {
-                        unconvertedLinks.Append($"{oldTarget}{Environment.NewLine}");
+                        unconvertedLinks.Add(oldTarget);
                     }
                 }
             }
