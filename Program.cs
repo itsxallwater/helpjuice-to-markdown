@@ -246,7 +246,7 @@ namespace HelpjuiceConverter
                             var content = a.Body;
                             SanitizeHTML(ref content);
                             content = await ImageHandler(filename, processedQuestions[a.QuestionId].CodeName, content);
-                            // if (a.QuestionId.Equals(260514))
+                            // if (a.QuestionId.Equals(444208))
                             // {
                             LinkHandler(filename, ref content);
                             // }
@@ -464,6 +464,10 @@ namespace HelpjuiceConverter
                                             .Replace("https://jbase.com/r99", "https://static.zumasys.com/jbase/r99")
                                             .Replace("www.jbase.com/r99", "https://static.zumasys.com/jbase/r99");
                     html = html.Replace(oldTarget, newTarget);
+                } // Try and filter out non-HelpJuice links
+                else if (oldTarget.Contains("http") && (!oldTarget.Contains("zumasys") && !oldTarget.Contains("jbase")))
+                {
+                    unconvertedLinks.Append($"{oldTarget}{Environment.NewLine}");
                 }
                 else
                 {
