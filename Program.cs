@@ -247,10 +247,7 @@ namespace HelpjuiceConverter
                             var content = a.Body;
                             SanitizeHTML(ref content);
                             content = await ImageHandler(filename, processedQuestions[a.QuestionId].CodeName, content);
-                            // if (a.QuestionId.Equals(277711))
-                            // {
                             LinkHandler(filename, ref content);
-                            // }
                             FileHandler(filename, markdownConverter.Convert(content));
                         }
                     }
@@ -264,10 +261,7 @@ namespace HelpjuiceConverter
         {
             foreach (var site in secrets)
             {
-                // if (site.Key.Equals("zumasys", StringComparison.CurrentCultureIgnoreCase))
-                // {
                 await ProcessSite(site.Key);
-                // }
             }
 
             var outputPath = Path.Combine(Path.GetTempPath(), _outputRoot);

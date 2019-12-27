@@ -3,33 +3,22 @@
 A utility to convert HelpJuice categories, questions and answers into Markdown files. Given your API key as a user secret, the program will convert:
 
 1. Your HelpJuice categories to directories (and sub-directories as related)
-2. Your HelpJuice questions to Markdown files (saved within the related directory)
-3. Your HelpJuice answers from HTML to Markdown (within the related Markdown file)
+2. Your HelpJuice questions to directories (saved within the related directory)
+3. Your HelpJuice answers from HTML to Markdown (as a `README.md` within the related question directory)
 
 Currently program requires that you complete a full conversion; categories, questions and answers must be processed in that order.
 
-## TODO / Feature list
+## Feature list
 
-- [x] At this point, we can hit the Zumasys and jBASE sites and retrieve Categories and Questions
-- [x] Categories should be turned into File Folders (start in Temp?)
-- [x] Questions should be turned into empty Markdown files in the appropriate folder
-- [x] Need to paginate through the API to return all questions
-- [x] Should display some job/work status to the console now
-- [x] Refactor!!
-- [x] Insert question tags into files
-- [x] Answers can then be retrieved but the down side is they are returned as CSV or XLS
-- [x] Will need to add a CSV parser to turn the download into a List\<Answer\>
-- [x] Once parsed, will need an HTML -> Markdown converter to convert and save the output to the appropriate file
-- [x] Images should be extracted from HelpJuice and added as local assets, after which the links should be updated
-- [x] Blob images not working correctly, not all docs rendering correctly
-- [x] Convert articles as files to folders w/ content in README.md & related images saved within
-- [x] Lower case folders and files
-- [x] Links need to be tracked and converted
-- [x] Check external links for validity
-- [x] Output failed link conversions to text doc
-- [x] Output failed images to text doc
-- [x] Include link to old document for good measure
-- [x] Build README.md for each directory that links to sub-directories and articles
+- Question tags are inserted into answer files as VuePress tags
+- Includes a link to old document, original question ID, created date/time, updated date/time, and accessibility setting within the answer file
+- Images are downloaded from HelpJuice and added as local assets within the related question directory
+- If the image was downloaded, the `<img src>` is updated appropriately before the HTML to Markdown conversion
+- Outputs failed images to text doc (`Images.txt`)
+- Forces lower case for all folders and files
+- Links are tracked and converted as able
+- Outputs failed/skipped link conversions to text doc (`Links.txt`)
+- Builds a README.md for each directory that links to sub-directories and articles by default
 
 ## Dependencies
 
