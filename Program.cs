@@ -77,7 +77,8 @@ namespace HelpjuiceConverter
             var config = new Config
             {
                 GithubFlavored = true, // generate GitHub flavoured markdown, supported for BR, PRE and table tags
-                UnknownTags = Config.UnknownTagsOption.Bypass
+                UnknownTags = Config.UnknownTagsOption.Bypass,
+                TableWithoutHeaderRowHandling = Config.TableWithoutHeaderRowHandlingOption.EmptyRow
             };
 
             markdownConverter = new Converter(config);
