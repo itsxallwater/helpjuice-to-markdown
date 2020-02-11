@@ -412,6 +412,11 @@ namespace HelpjuiceConverter
                     {
                         var imageBytes = await downloader.GetByteArrayAsync(new Uri(oldSrc));
 
+                        // If image already exists by this name, add on a "-#" suffix to enforce uniqueness
+                        if (File.Exists(newSrc))
+                        {
+                            newSrc = Path.Combine(Path.GetDirectoryName(newSrc), $"{Path.GetFileNameWithoutExtension(newSrc)}-{i.ToString()}{Path.GetExtension(newSrc)}");
+                        }
                         // Save image
                         await File.WriteAllBytesAsync(newSrc, imageBytes);
                     }
